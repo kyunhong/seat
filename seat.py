@@ -6,18 +6,31 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import platform
 import io
+import matplotlib.font_manager as fm
+import os
 
 # ---------------------------------------------------------
 # 1. 폰트 및 기본 설정
 # ---------------------------------------------------------
 def set_korean_font():
-    system_name = platform.system()
-    if system_name == "Windows":
-        plt.rc('font', family='Malgun Gothic')
-    elif system_name == "Darwin":
-        plt.rc('font', family='AppleGothic')
-    else:
+    # 같은 폴더에 'NanumGothic.ttf'가 있으면 이걸 우선 사용
+    font_path = "NanumGothic.ttf"
+    
+    if os.path.exists(font_path):
+        # 폰트 파일을 매트플롯립에 등록
+        fm.fontManager.addfont(font_path)
+        # 등록된 폰트 이름으로 설정
         plt.rc('font', family='NanumGothic')
+    else:
+        # 폰트 파일이 없을 때 기존 로직 유지
+        system_name = platform.system()
+        if system_name == "Windows":
+            plt.rc('font', family='Malgun Gothic')
+        elif system_name == "Darwin": # Mac
+            plt.rc('font', family='AppleGothic')
+        else:
+            plt.rc('font', family='NanumGothic')
+
     plt.rcParams['axes.unicode_minus'] = False
 
 set_korean_font()
