@@ -1,0 +1,1978 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="교사용 자리 배치 사이트">
+    <meta name="robots" content="index, follow">
+    <title>자리배치 도우미</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Pretendard', 'Malgun Gothic', sans-serif;
+            overflow-x: hidden;
+        }
+        #sidebar {
+            border-radius: 20px;
+            min-height: 100vh;
+            width: 300px;
+            position: fixed;
+            top: 0; left: 0;
+            background: #fff;
+            border-right: 1px solid #e9ecef;
+            z-index: 1000;
+            padding: 25px 20px;
+            transition: all 0.3s ease;
+            box-shadow: 4px 0 10px rgba(0,0,0,0.03);
+            overflow-y: auto;
+        }
+        #sidebar.active { margin-left: -300px; }
+        #content {
+            margin-left: 300px;
+            padding: 40px;
+            width: calc(100% - 300px);
+            transition: all 0.3s ease;
+        }
+        #content.active { margin-left: 0; width: 100%; }
+        #sidebarCollapse {
+            position: fixed;
+            top: 15px; left: 310px;
+            z-index: 1001;
+            transition: all 0.3s ease;
+            border-radius: 50%;
+            width: 40px; height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #sidebarCollapse.active { left: 15px; }
+        .file-upload-card {
+            background: #f8f9fa;
+            border: 2px dashed #ced4da;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            margin-bottom: 15px;
+        }
+        .file-upload-card:hover  { background: #e9ecef; border-color: #adb5bd; }
+        .file-upload-card:focus  { outline: 2px solid #0d6efd; outline-offset: 2px; }
+        .file-upload-card.dragover  { background: #e7f1ff; border-color: #0d6efd; color: #0d6efd; }
+        .file-upload-card.has-file  { background: #f0fff4; border-color: #198754; border-style: solid; }
+        .file-icon { font-size: 1.5rem; color: #6c757d; margin-bottom: 5px; }
+        .file-upload-card.has-file .file-icon { color: #198754; }
+        .file-status-text { font-size: 0.85rem; color: #495057; word-break: break-all; }
+        .file-input-hidden { display: none; }
+        .btn-delete-file {
+            position: absolute;
+            top: -10px; right: -10px;
+            width: 24px; height: 24px;
+            border-radius: 50%;
+            border: 1px solid #dee2e6;
+            background-color: #fff;
+            color: #dc3545;
+            font-size: 12px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+            z-index: 10;
+        }
+        .btn-delete-file:hover { background-color: #dc3545; color: white; transform: scale(1.1); }
+        .file-upload-card.has-file .btn-delete-file { display: flex; }
+        /* ── 고정석/제외석 셀 스타일 ── */
+        .fixed-seat-select {
+            font-size: 0.9rem;
+            padding: 4px;
+            width: 100%;
+            text-align: center;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        td.seat-fixed {
+            background-color: #dbeafe !important;
+            border: 2px solid #3b82f6 !important;
+            border-radius: 6px;
+        }
+        td.seat-fixed .fixed-seat-select {
+            background-color: #dbeafe;
+            border-color: #3b82f6;
+            color: #1d4ed8;
+            font-weight: bold;
+        }
+        td.seat-excluded {
+            background-color: #fee2e2 !important;
+            border: 2px solid #ef4444 !important;
+            border-radius: 6px;
+        }
+        td.seat-excluded .fixed-seat-select {
+            background-color: #fee2e2;
+            border-color: #ef4444;
+            color: #b91c1c;
+            font-weight: bold;
+        }
+        .fixed-seat-table td {
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+        /* 설정 요약 뱃지 */
+        .seat-summary-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        .student-list-box  { max-height: 400px; overflow-y: auto; font-size: 0.9rem; border: 1px solid #eee; border-radius: 8px; }
+        .control-panel     { background: #fff; border-radius: 12px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 30px; }
+        .accordion-button:not(.collapsed) { background-color: #eff6ff; color: #2563eb; }
+        .loading-overlay {
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(255,255,255,0.8);
+            z-index: 2000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        .fab-btn {
+            position: fixed;
+            bottom: 40px; right: 40px;
+            width: 70px; height: 70px;
+            border-radius: 50%;
+            font-size: 28px;
+            z-index: 1050;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: none;
+        }
+        .fab-btn:hover  { transform: scale(1.1) rotate(-10deg); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+        .fab-btn:active { transform: scale(0.95); }
+        .guide-box { background-color: #f9f9f9; border-left: 5px solid #2196F3; padding: 10px; margin-bottom: 15px; }
+        .btn-guide {
+            background-color: #17a2b8; color: white;
+            padding: 8px 12px; border: none; border-radius: 4px;
+            cursor: pointer; font-size: 0.9em; margin-bottom: 10px; width: 100%;
+        }
+        .btn-guide:hover { background-color: #138496; }
+        .seat-grid {
+            display: grid;
+            gap: 3px; padding: 10px;
+            border-radius: 15px;
+            margin: 20px auto;
+            width: 100%; max-width: 1500px;
+            box-sizing: border-box;
+            overflow-x: auto;
+            background-color: var(--color-grid-bg, #FFFFFF);
+        }
+        .seat-item {
+            background-color: var(--color-default, #E3F2FD);
+            border: 2px solid var(--color-seat-border, #ced4da);
+            border-radius: 8px;
+            padding: 15px 5px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.3em;
+            color: #333;
+            cursor: grab;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+            transition: background-color 0.2s, border-color 0.2s, transform 0.2s;
+            user-select: none;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            word-break: keep-all;
+        }
+        .seat-item.front-seat { background-color: var(--color-front, #FFCDD2); }
+        .seat-item.dragging   { opacity: 0.5; border-color: #0d6efd; background-color: #e7f1ff; transform: scale(1.05); }
+        .seat-item.drag-over  { border: 2px dashed #0d6efd; background-color: #f1f3f5; }
+        .download-panel { margin-top: 30px; padding: 20px; border: 1px solid #dee2e6; border-radius: 12px; background-color: #f8f9fa; display: inline-block; }
+        .download-panel-inner { display: flex; align-items: center; justify-content: center; gap: 15px; flex-wrap: wrap; }
+        .grade-input-group { display: flex; align-items: center; gap: 8px; }
+        .divider-v { width: 1px; height: 30px; background-color: #ccc; margin: 0 10px; }
+        .color-setting-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .color-setting-row:last-child { border-bottom: none; }
+        .color-setting-label { flex: 1; font-size: 0.9rem; color: #555; }
+        .color-preview-box {
+            width: 28px; height: 28px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            cursor: pointer;
+            transition: transform 0.2s;
+            flex-shrink: 0;
+        }
+        .color-preview-box:hover { transform: scale(1.1); }
+        input[type="color"] { width: 0; height: 0; opacity: 0; position: absolute; }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+            to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+        .site-footer { margin-top: 50px; padding: 20px; text-align: center; color: #666; }
+        .site-footer hr { border: 0; height: 1px; background: #ddd; margin-bottom: 20px; }
+        .site-footer p { font-size: 0.9em; line-height: 1.6; }
+        .site-footer a { color: #4A90E2; text-decoration: none; }
+        /* ── 카드 뒤집기 애니메이션 ── */
+        .card-flip-hidden {
+            opacity: 0;
+            transform: rotateY(90deg) scale(0.85);
+            transition: opacity 0.35s ease, transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .card-flip-reveal {
+            opacity: 1;
+            transform: rotateY(0deg) scale(1);
+        }
+        /* ── 애니메이션 속도 슬라이더 ── */
+        .anim-speed-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 200px;
+        }
+        .anim-speed-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .anim-speed-row input[type="range"] {
+            flex: 1;
+            accent-color: #0d6efd;
+            cursor: pointer;
+        }
+        .anim-speed-badge {
+            font-size: 0.78rem;
+            background: #e9ecef;
+            border-radius: 20px;
+            padding: 2px 8px;
+            color: #555;
+            min-width: 52px;
+            text-align: center;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+        /* ── 교탁 라벨 ── */
+        .chalkboard-label {
+            text-align: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: #555;
+            padding: 6px 20px;
+            background: #f3f4f6;
+            border: 1.5px solid #d1d5db;
+            border-radius: 8px;
+            display: inline-block;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+        }
+        .fixed-table-wrapper {
+            overflow-x: auto;
+            text-align: center;
+        }
+        /* ── 번호순 배치 방향 카드 (신규) ── */
+        .order-dir-card {
+            border: 2px solid #dee2e6;
+            border-radius: 10px;
+            padding: 10px 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #fff;
+            text-align: center;
+            user-select: none;
+            min-width: 80px;
+        }
+        .order-dir-card:hover {
+            border-color: #198754;
+            background: #f0fff4;
+        }
+        .order-dir-card.selected {
+            border-color: #198754;
+            background: #d1fae5;
+            box-shadow: 0 0 0 2px #86efac;
+        }
+        .order-dir-arrow {
+            font-size: 1.6rem;
+            display: block;
+            margin-bottom: 4px;
+        }
+        .order-dir-label {
+            font-size: 0.72rem;
+            color: #374151;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+        /* ── 번호순 배치 패널 ── */
+        #order-dir-panel {
+            background: #f8fffe;
+            border: 1px solid #d1fae5;
+            border-radius: 10px;
+            padding: 14px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+<div id="page-wrapper">
+    <!-- 로딩 -->
+    <div id="loading" class="loading-overlay" role="status" aria-live="polite">
+        <div class="spinner-border text-primary" style="width:3rem;height:3rem;"></div>
+        <div class="mt-3 fw-bold text-secondary">작업 중입니다...</div>
+    </div>
+    <form id="mainForm" enctype="multipart/form-data">
+        <!-- ======================== 사이드바 ======================== -->
+        <nav id="sidebar" aria-label="설정 패널">
+            <div class="d-flex align-items-center mb-4">
+                <h5 class="fw-bold m-0 me-2">📂 파일 설정</h5>
+            </div>
+            <button type="button" class="btn-guide shadow-sm"
+                    data-bs-toggle="modal" data-bs-target="#guideModal">
+                <i class="fa-solid fa-circle-question me-1"></i> 파일 작성법 &amp; 예시 다운로드
+            </button>
+            <hr class="my-3 text-secondary">
+            <!-- 전체 학생 -->
+            <div class="mb-3">
+                <div class="d-inline-flex align-items-center bg-white border rounded-pill px-2 py-1 mb-2">
+                    <span class="badge rounded-pill bg-danger me-2">필수</span>
+                    <span class="small fw-bold text-secondary me-2">전체 학생</span>
+                    <span
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="top"
+                        data-bs-title="파일 없이 직접 명단을 입력할 수 있습니다.">
+                        <button type="button"
+                                class="btn btn-sm btn-light rounded-circle shadow-sm"
+                                style="width:28px;height:28px;padding:0;"
+                                data-bs-toggle="modal" data-bs-target="#modalStudent"
+                                aria-label="전체 학생 명단 직접 수정">
+                            <i class="fa-solid fa-pen text-dark" style="font-size:12px;"></i>
+                        </button>
+                    </span>
+                </div>
+                <div class="file-upload-card {% if students %}has-file{% endif %}"
+                     id="drop-student" role="button" tabindex="0"
+                     aria-label="전체 학생 명단 파일 업로드"
+                     onkeydown="if(event.key==='Enter'||event.key===' ')document.getElementById('file-student').click()">
+                    <input type="file" class="file-input-hidden"
+                           name="student_file" id="file-student"
+                           accept=".xlsx,.xls,.csv" aria-label="학생 명단 파일 선택">
+                    <button type="button" class="btn-delete-file"
+                            onclick="clearFile('student', event)"
+                            title="삭제" aria-label="학생 명단 삭제">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                    <div class="icon-area" aria-hidden="true">
+                        <i class="fa-solid fa-users file-icon"></i>
+                    </div>
+                    <div class="file-status-text" id="text-student" aria-live="polite">
+                        {% if students %}
+                            <span class="fw-bold text-success">{{ students|length }}명 로드됨</span>
+                        {% else %}클릭 또는 드래그{% endif %}
+                    </div>
+                </div>
+            </div>
+            <!-- 앞자리 희망 -->
+            <div class="mb-3">
+                <div class="d-inline-flex align-items-center bg-white border rounded-pill px-2 py-1 mb-2">
+                    <span class="badge rounded-pill me-2" style="background-color:#f88eef;">선택</span>
+                    <span class="small fw-bold text-secondary me-2">앞자리 희망 학생</span>
+                    <span
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="top"
+                        data-bs-title="파일 없이 직접 명단을 입력할 수 있습니다.">
+                        <button type="button"
+                                class="btn btn-sm btn-light rounded-circle shadow-sm"
+                                style="width:28px;height:28px;padding:0;"
+                                data-bs-toggle="modal" data-bs-target="#modalFront"
+                                aria-label="앞자리 희망 명단 직접 수정">
+                            <i class="fa-solid fa-pen text-dark" style="font-size:12px;"></i>
+                        </button>
+                    </span>
+                </div>
+                <div class="file-upload-card {% if front_list %}has-file{% endif %}"
+                     id="drop-front" role="button" tabindex="0"
+                     aria-label="앞자리 희망 학생 파일 업로드"
+                     onkeydown="if(event.key==='Enter'||event.key===' ')document.getElementById('file-front').click()">
+                    <input type="file" class="file-input-hidden"
+                           name="front_file" id="file-front"
+                           accept=".xlsx,.xls,.txt" aria-label="앞자리 희망 파일 선택">
+                    <button type="button" class="btn-delete-file"
+                            onclick="clearFile('front', event)"
+                            title="삭제" aria-label="앞자리 희망 명단 삭제">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                    <div class="icon-area" aria-hidden="true">
+                        <i class="fa-solid fa-glasses file-icon"></i>
+                    </div>
+                    <div class="file-status-text" id="text-front" aria-live="polite">
+                        {% if front_list %}
+                            <span class="fw-bold text-success">{{ front_list|length }}명 설정됨</span>
+                        {% else %}클릭 또는 드래그{% endif %}
+                    </div>
+                </div>
+            </div>
+            <hr class="my-3 text-secondary opacity-25">
+            <!-- 고급 설정 (짝 제한) -->
+            <div class="d-grid mb-2">
+                <button class="btn btn-sm btn-link text-secondary text-decoration-none"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#collapseAdvanced"
+                        aria-expanded="false"
+                        aria-controls="collapseAdvanced">
+                    <i class="fa-solid fa-chevron-down me-1"></i> 고급 설정
+                </button>
+            </div>
+            <div class="collapse" id="collapseAdvanced">
+                <div class="mb-4 rounded">
+                    <div class="d-inline-flex align-items-center bg-white border rounded-pill px-2 py-1 mb-2 w-100 justify-content-between">
+                        <div class="d-flex align-items-center">
+                            <span class="badge rounded-pill bg-primary me-2">선택</span>
+                            <span class="small fw-bold text-secondary me-2">짝 제한</span>
+                        </div>
+                        <span
+                            data-bs-toggle="tooltip"
+                            data-bs-placement="top"
+                            data-bs-title="파일 없이 직접 명단을 입력할 수 있습니다.">
+                            <button type="button"
+                                    class="btn btn-sm btn-light rounded-circle border shadow-sm"
+                                    style="width:28px;height:28px;padding:0;"
+                                    data-bs-toggle="modal" data-bs-target="#modalRestrict"
+                                    aria-label="짝 제한 명단 직접 수정">
+                                <i class="fa-solid fa-pen text-dark" style="font-size:12px;"></i>
+                            </button>
+                        </span>
+                    </div>
+                    <div class="file-upload-card {% if has_restrict %}has-file{% endif %}"
+                         id="drop-restrict" role="button" tabindex="0"
+                         aria-label="짝 제한 파일 업로드"
+                         onkeydown="if(event.key==='Enter'||event.key===' ')document.getElementById('file-restrict').click()">
+                        <input type="file" class="file-input-hidden"
+                               name="restrict_file" id="file-restrict"
+                               accept=".txt" aria-label="짝 제한 파일 선택">
+                        <button type="button" class="btn-delete-file"
+                                onclick="clearFile('restrict', event)"
+                                title="삭제" aria-label="짝 제한 명단 삭제">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                        <div class="icon-area" aria-hidden="true">
+                            <i class="fa-solid fa-ban file-icon"></i>
+                        </div>
+                        <div class="file-status-text" id="text-restrict" aria-live="polite">
+                            {% if has_restrict %}
+                                <span class="fw-bold text-success">{{ restrict_list|length }}쌍 설정됨</span>
+                            {% else %}클릭 또는 드래그{% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+        <!-- 사이드바 토글 -->
+        <button type="button" id="sidebarCollapse"
+                class="btn btn-white shadow border"
+                aria-label="사이드바 열기/닫기">
+            <i class="fa-solid fa-bars"></i>
+        </button>
+        <!-- ======================== 메인 콘텐츠 ======================== -->
+        <main id="content" role="main">
+            <div id="main-content-area">
+                {% if not students %}
+                <div class="text-center mt-5 pt-5">
+                    <div class="display-1 text-muted mb-3">
+                        <i class="fa-solid fa-file-circle-plus"></i>
+                    </div>
+                    <h3 class="fw-bold text-secondary">학생 명단을 등록해주세요</h3>
+                    <p class="text-muted">
+                        왼쪽 <strong>[전체 학생]</strong> 박스를 클릭하거나 파일을 끌어오세요.
+                    </p>
+                </div>
+                {% else %}
+                <!-- FAB -->
+                <button type="button" onclick="updateUI('run')"
+                        class="btn btn-primary text-white fab-btn"
+                        id="fab-btn"
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="left"
+                        data-bs-title="자리 재배치"
+                        aria-label="자리 배치 실행">
+                    <i class="fa-solid fa-rocket" id="fab-icon"></i>
+                </button>
+                <!-- 헤더 -->
+                <div class="bg-white p-3 mb-4 rounded shadow-sm border-start border-5 border-primary d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4 class="fw-bold m-0 text-dark">
+                            <i class="fa-solid fa-school text-primary me-2"></i>자리배치 도우미
+                        </h4>
+                    </div>
+                    <div>
+                        <span class="badge p-2"
+                              style="background:linear-gradient(45deg,#ec008c,#fc6767);">
+                            <i class="fa-solid fa-wand-magic-sparkles me-1"></i>
+                            개발자: <strong>박홍균</strong>
+                        </span>
+                        <div class="mt-1">
+                            <span class="badge bg-success bg-opacity-10 text-success border border-success me-1">
+                                <i class="fa-solid fa-user-clock me-1"></i>
+                                Today: <strong>{{ today_cnt }}</strong>
+                            </span>
+                            <span class="badge bg-light text-secondary border">
+                                <i class="fa-solid fa-chart-line me-1"></i>
+                                Total: <strong>{{ total_cnt }}</strong>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <!-- 아코디언 -->
+                <div class="accordion mb-4 shadow-sm" id="accordionSettings">
+                    <div class="accordion-item border-0 overflow-hidden">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed fw-bold"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#collapseSettings"
+                                    aria-expanded="false"
+                                    aria-controls="collapseSettings">
+                                <i class="fa-solid fa-screwdriver-wrench me-2"></i>
+                                고정석/제외석 · 명단 · 색상 관리
+                            </button>
+                        </h2>
+                        <div id="collapseSettings"
+                             class="accordion-collapse collapse"
+                             data-bs-parent="#accordionSettings">
+                            <div class="accordion-body bg-light">
+                                <ul class="nav nav-tabs" id="myTab" role="tablist">
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link active" id="fixed-tab"
+                                                data-bs-toggle="tab"
+                                                data-bs-target="#fixed-pane"
+                                                type="button" role="tab"
+                                                aria-controls="fixed-pane"
+                                                aria-selected="true">
+                                            🔒 고정석/제외석
+                                        </button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link" id="list-tab"
+                                                data-bs-toggle="tab"
+                                                data-bs-target="#list-pane"
+                                                type="button" role="tab"
+                                                aria-controls="list-pane"
+                                                aria-selected="false">
+                                            📋 명단 확인
+                                        </button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link" id="color-tab"
+                                                data-bs-toggle="tab"
+                                                data-bs-target="#color-pane"
+                                                type="button" role="tab"
+                                                aria-controls="color-pane"
+                                                aria-selected="false">
+                                            🎨 색상 설정
+                                        </button>
+                                    </li>
+                                </ul>
+                                <div class="tab-content bg-white p-3 border border-top-0 rounded-bottom"
+                                     id="myTabContent">
+                                    <!-- ======================== 고정석 탭 ======================== -->
+                                    <div class="tab-pane fade show active" id="fixed-pane"
+                                         role="tabpanel" aria-labelledby="fixed-tab">
+                                        <!-- 안내 문구 + 범례 -->
+                                        <div class="alert alert-info py-2 px-3 mb-3 small">
+                                            <i class="fa-solid fa-circle-info me-1"></i>
+                                            특정 자리에 학생을 <strong>고정</strong>하거나 자리를 <strong>비울</strong> 수 있습니다.
+                                            설정 후 <strong>배치 버튼</strong>을 눌러야 반영됩니다.
+                                            <div class="mt-1 d-flex flex-wrap gap-2">
+                                                <span class="seat-summary-badge bg-white border text-secondary">
+                                                    <i class="fa-solid fa-circle-dot text-secondary"></i> [ · ] 자동배치
+                                                </span>
+                                                <span class="seat-summary-badge bg-white border" style="color:#b91c1c;">
+                                                    🚫 자리 비움
+                                                </span>
+                                                <span class="seat-summary-badge bg-white border" style="color:#1d4ed8;">
+                                                    🔒 이름 선택 → 해당 학생 고정
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <!-- 상단: 초기화 버튼 -->
+                                        <div class="d-flex justify-content-end mb-2">
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-danger"
+                                                    onclick="resetFixedSeats()">
+                                                <i class="fa-solid fa-rotate-left"></i> 초기화
+                                            </button>
+                                        </div>
+                                        <!-- 교탁 라벨 -->
+                                        <div class="text-center mb-1">
+                                            <span class="chalkboard-label">
+                                                교탁 (칠판)
+                                            </span>
+                                        </div>
+                                        <!-- 고정석 테이블 -->
+                                        <div class="fixed-table-wrapper">
+                                            <table class="table table-bordered text-center table-sm d-inline-block mb-0 fixed-seat-table"
+                                                   style="width:auto;"
+                                                   aria-label="고정석 지정 테이블">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th class="text-muted fw-normal small" style="width:30px;"></th>
+                                                        {% for c in range(col_num) %}
+                                                        <th class="text-muted fw-normal small">{{ c + 1 }}열</th>
+                                                        {% endfor %}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for r in range(grid_rows + 1) %}
+                                                    <tr>
+                                                        <td class="text-muted small align-middle bg-light" style="white-space:nowrap;">
+                                                            {{ r + 1 }}행
+                                                        </td>
+                                                        {% for c in range(col_num) %}
+                                                        <td class="p-1" style="width:140px;height:60px;"
+                                                            id="td_{{ r }}_{{ c }}">
+                                                            {% set key = 'fixed_' ~ r ~ '_' ~ c %}
+                                                            {% set selected_val = fixed_seats_state.get(key, '.') %}
+                                                            <select name="{{ key }}"
+                                                                    class="form-select form-select-sm fixed-seat-select h-100"
+                                                                    aria-label="{{ r + 1 }}행 {{ c + 1 }}열 고정석 설정"
+                                                                    onchange="onFixedSeatChange(this, '{{ r }}', '{{ c }}')">
+                                                                <option value=".">· 자동</option>
+                                                                <option value="🚫 비움"
+                                                                        style="color:red;"
+                                                                        {% if selected_val == '🚫 비움' %}selected{% endif %}>
+                                                                    🚫 비움
+                                                                </option>
+                                                                {% for s in students %}
+                                                                <option value="{{ s }}"
+                                                                        {% if selected_val == s %}selected{% endif %}>
+                                                                    🔒 {{ s }}
+                                                                </option>
+                                                                {% endfor %}
+                                                            </select>
+                                                        </td>
+                                                        {% endfor %}
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <!-- 설정 요약 -->
+                                        <div class="mt-3 pt-2 border-top" id="fixed-seat-summary">
+                                            <!-- JS로 동적 렌더링 -->
+                                        </div>
+                                    </div>
+                                    <!-- 명단 탭 -->
+                                    <div class="tab-pane fade" id="list-pane"
+                                         role="tabpanel" aria-labelledby="list-tab">
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <div class="card h-100 border-0 bg-light">
+                                                    <div class="card-header bg-primary text-white text-center fw-bold">
+                                                        📋 전체 학생
+                                                    </div>
+                                                    <div class="card-body p-0 student-list-box">
+                                                        <table class="table table-striped table-sm text-center table-bordered mb-0 bg-white"
+                                                               aria-label="전체 학생 명단">
+                                                            <thead class="sticky-top table-secondary">
+                                                                <tr>
+                                                                    <th scope="col">번호</th>
+                                                                    <th scope="col">이름</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {% for s in student_table %}
+                                                                <tr>
+                                                                    <td>{{ s.num }}</td>
+                                                                    <td>{{ s.name }}</td>
+                                                                </tr>
+                                                                {% endfor %}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="card h-100 border-0 bg-light">
+                                                    <div class="card-header bg-danger text-white text-center fw-bold">
+                                                        📋 앞자리 희망
+                                                    </div>
+                                                    <div class="card-body p-0 student-list-box">
+                                                        {% if front_list %}
+                                                        <table class="table table-hover table-sm text-center table-bordered mb-0 bg-white"
+                                                               aria-label="앞자리 희망 학생 명단">
+                                                            <thead class="sticky-top table-secondary">
+                                                                <tr>
+                                                                    <th scope="col">번호</th>
+                                                                    <th scope="col">이름</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {% for s in front_list %}
+                                                                <tr>
+                                                                    <td>{{ s.split('.')[0] }}</td>
+                                                                    <td>{{ s.split('.')[1] }}</td>
+                                                                </tr>
+                                                                {% endfor %}
+                                                            </tbody>
+                                                        </table>
+                                                        {% else %}
+                                                        <div class="d-flex align-items-center justify-content-center h-100 text-muted">
+                                                            희망 학생 없음
+                                                        </div>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- 색상 설정 탭 -->
+                                    <div class="tab-pane fade" id="color-pane"
+                                         role="tabpanel" aria-labelledby="color-tab">
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <div class="card border-0 shadow-sm h-100">
+                                                    <div class="card-header fw-bold bg-light">
+                                                        🎨 좌석 색상
+                                                    </div>
+                                                    <div class="card-body">
+                                                        <!-- 기본 좌석 -->
+                                                        <div class="color-setting-row">
+                                                            <span class="color-setting-label">
+                                                                <i class="fa-solid fa-square me-1 text-primary"></i>
+                                                                기본 좌석
+                                                            </span>
+                                                            <div class="color-preview-box"
+                                                                 id="preview-color_default"
+                                                                 style="background-color:{{ custom_colors.color_default }};"
+                                                                 onclick="document.getElementById('picker-color_default').click()"
+                                                                 title="클릭하여 색상 변경">
+                                                            </div>
+                                                            <input type="color" id="picker-color_default"
+                                                                   value="{{ custom_colors.color_default }}"
+                                                                   oninput="previewColor('color_default', this.value)">
+                                                            <button type="button"
+                                                                    class="btn btn-outline-secondary btn-sm"
+                                                                    style="font-size:0.75rem;padding:2px 6px;"
+                                                                    onclick="resetColor('color_default', '#E3F2FD')">
+                                                                초기화
+                                                            </button>
+                                                        </div>
+                                                        <!-- 앞자리 희망 -->
+                                                        <div class="color-setting-row">
+                                                            <span class="color-setting-label">
+                                                                <i class="fa-solid fa-square me-1" style="color:#FFCDD2;"></i>
+                                                                앞자리 희망
+                                                            </span>
+                                                            <div class="color-preview-box"
+                                                                 id="preview-color_front"
+                                                                 style="background-color:{{ custom_colors.color_front }};"
+                                                                 onclick="document.getElementById('picker-color_front').click()"
+                                                                 title="클릭하여 색상 변경">
+                                                            </div>
+                                                            <input type="color" id="picker-color_front"
+                                                                   value="{{ custom_colors.color_front }}"
+                                                                   oninput="previewColor('color_front', this.value)">
+                                                            <button type="button"
+                                                                    class="btn btn-outline-secondary btn-sm"
+                                                                    style="font-size:0.75rem;padding:2px 6px;"
+                                                                    onclick="resetColor('color_front', '#FFCDD2')">
+                                                                초기화
+                                                            </button>
+                                                        </div>
+                                                        <!-- 좌석 테두리 -->
+                                                        <div class="color-setting-row">
+                                                            <span class="color-setting-label">
+                                                                <i class="fa-regular fa-square me-1"></i>
+                                                                좌석 테두리
+                                                            </span>
+                                                            <div class="color-preview-box"
+                                                                 id="preview-color_seat_border"
+                                                                 style="background-color:{{ custom_colors.color_seat_border }};"
+                                                                 onclick="document.getElementById('picker-color_seat_border').click()"
+                                                                 title="클릭하여 색상 변경">
+                                                            </div>
+                                                            <input type="color" id="picker-color_seat_border"
+                                                                   value="{{ custom_colors.color_seat_border }}"
+                                                                   oninput="previewColor('color_seat_border', this.value)">
+                                                            <button type="button"
+                                                                    class="btn btn-outline-secondary btn-sm"
+                                                                    style="font-size:0.75rem;padding:2px 6px;"
+                                                                    onclick="resetColor('color_seat_border', '#000000')">
+                                                                초기화
+                                                            </button>
+                                                        </div>
+                                                        <!-- 그리드 배경 -->
+                                                        <div class="color-setting-row">
+                                                            <span class="color-setting-label">
+                                                                <i class="fa-solid fa-border-all me-1"></i>
+                                                                그리드 배경
+                                                            </span>
+                                                            <div class="color-preview-box"
+                                                                 id="preview-color_grid_bg"
+                                                                 style="background-color:{{ custom_colors.color_grid_bg }};"
+                                                                 onclick="document.getElementById('picker-color_grid_bg').click()"
+                                                                 title="클릭하여 색상 변경">
+                                                            </div>
+                                                            <input type="color" id="picker-color_grid_bg"
+                                                                   value="{{ custom_colors.color_grid_bg }}"
+                                                                   oninput="previewColor('color_grid_bg', this.value)">
+                                                            <button type="button"
+                                                                    class="btn btn-outline-secondary btn-sm"
+                                                                    style="font-size:0.75rem;padding:2px 6px;"
+                                                                    onclick="resetColor('color_grid_bg', '#FFFFFF')">
+                                                                초기화
+                                                            </button>
+                                                        </div>
+                                                        <!-- 교탁 색상 -->
+                                                        <div class="color-setting-row">
+                                                            <span class="color-setting-label">
+                                                                <i class="fa-solid fa-chalkboard me-1" style="color:#F5C0F5;"></i>
+                                                                교탁
+                                                            </span>
+                                                            <div class="color-preview-box"
+                                                                id="preview-color_podium"
+                                                                style="background-color:{{ custom_colors.color_podium }};"
+                                                                onclick="document.getElementById('picker-color_podium').click()"
+                                                                title="클릭하여 색상 변경">
+                                                            </div>
+                                                            <input type="color" id="picker-color_podium"
+                                                                value="{{ custom_colors.color_podium }}"
+                                                                oninput="previewColor('color_podium', this.value)">
+                                                            <button type="button"
+                                                                    class="btn btn-outline-secondary btn-sm"
+                                                                    style="font-size:0.75rem;padding:2px 6px;"
+                                                                    onclick="resetColor('color_podium', '#F5C0F5')">
+                                                                초기화
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <div class="card-footer bg-white border-0 d-flex gap-2">
+                                                        <button type="button"
+                                                                class="btn btn-primary btn-sm flex-grow-1"
+                                                                onclick="saveColors()">
+                                                            <i class="fa-solid fa-floppy-disk me-1"></i>
+                                                            저장 (새로고침 후에도 유지)
+                                                        </button>
+                                                        <button type="button"
+                                                                class="btn btn-outline-danger btn-sm"
+                                                                onclick="resetAllColors()">
+                                                            <i class="fa-solid fa-rotate-left me-1"></i> 전체 초기화
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <!-- 미리보기 -->
+                                            <div class="col-md-6">
+                                                <div class="card border-0 shadow-sm h-100">
+                                                    <div class="card-header fw-bold bg-light">
+                                                        👁️ 미리보기
+                                                    </div>
+                                                    <div class="card-body d-flex flex-column gap-2 justify-content-center align-items-center">
+                                                        <div id="preview-grid"
+                                                             style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:12px;border-radius:12px;width:100%;background-color:{{ custom_colors.color_grid_bg }};">
+                                                            <div class="preview-seat"
+                                                                 style="background-color:{{ custom_colors.color_default }};border:2px solid {{ custom_colors.color_seat_border }};border-radius:8px;padding:10px;text-align:center;font-size:0.85rem;font-weight:bold;">
+                                                                일반
+                                                            </div>
+                                                            <div class="preview-seat"
+                                                                 style="background-color:{{ custom_colors.color_front }};border:2px solid {{ custom_colors.color_seat_border }};border-radius:8px;padding:10px;text-align:center;font-size:0.85rem;font-weight:bold;">
+                                                                앞자리
+                                                            </div>
+                                                        </div>
+                                                        <small class="text-muted mt-2">
+                                                            색상 변경 시 즉시 반영됩니다.
+                                                        </small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- ======================== 컨트롤 패널 ======================== -->
+                <div class="control-panel">
+                    <div class="row g-3 align-items-end">
+                        <!-- 열 개수 -->
+                        <div class="col-md-1">
+                            <label class="fw-bold small mb-1" for="col_num_input">열 개수</label>
+                            <input type="number" id="col_num_input"
+                                class="form-control" name="col_num"
+                                value="{{ col_num }}" min="1" max="12"
+                                onchange="updateUI('grid')"
+                                data-bs-toggle="tooltip"
+                                data-bs-placement="top"
+                                data-bs-title="가로 열 수 설정"
+                                aria-label="열 개수 설정">
+                        </div>
+                        <!-- 배치 모드 -->
+                        <div class="col-md-2">
+                            <fieldset>
+                                <legend class="fw-bold small mb-1">배치 모드</legend>
+                                <div class="btn-group w-100" role="group" aria-label="배치 모드 선택">
+                                    <input type="radio" class="btn-check"
+                                        name="seat_mode" id="mode1" value="pair"
+                                        {% if seat_mode == 'pair' %}checked{% endif %}>
+                                    <label class="btn btn-outline-secondary" for="mode1">
+                                        <i class="fa-solid fa-user-group"></i> 짝꿍
+                                    </label>
+                                    <input type="radio" class="btn-check"
+                                        name="seat_mode" id="mode2" value="exam"
+                                        {% if seat_mode == 'exam' %}checked{% endif %}>
+                                    <label class="btn btn-outline-secondary" for="mode2">
+                                        <i class="fa-solid fa-file-pen"></i> 시험대형
+                                    </label>
+                                </div>
+                            </fieldset>
+                        </div>
+                        <!-- 시점 -->
+                        <div class="col-md-2">
+                            <fieldset>
+                                <legend class="fw-bold small mb-1">시점</legend>
+                                <div class="btn-group w-100" role="group" aria-label="시점 선택">
+                                    <input type="radio" class="btn-check"
+                                        name="view_type" id="view1" value="student"
+                                        {% if view_type == 'student' %}checked{% endif %}
+                                        onchange="updateUI('redraw')">
+                                    <label class="btn btn-outline-secondary" for="view1"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        data-bs-title="학생이 칠판을 바라보는 시점">
+                                        👀 학생
+                                    </label>
+                                    <input type="radio" class="btn-check"
+                                        name="view_type" id="view2" value="teacher"
+                                        {% if view_type == 'teacher' %}checked{% endif %}
+                                        onchange="updateUI('redraw')">
+                                    <label class="btn btn-outline-secondary" for="view2"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        data-bs-title="교사가 학생을 바라보는 시점">
+                                        👨‍🏫 교사
+                                    </label>
+                                </div>
+                            </fieldset>
+                        </div>
+                        <!-- 배치 방식 -->
+                        <div class="col-md-3">
+                            <fieldset>
+                                <legend class="fw-bold small mb-1">
+                                    <i class="fa-solid fa-layer-group me-1 text-primary"></i>
+                                    배치 방식
+                                </legend>
+                                <div class="btn-group w-100" role="group" aria-label="배치 방식 선택">
+                                    <input type="radio" class="btn-check"
+                                        name="arrange_type" id="type-random" value="random"
+                                        {% if arrange_type == 'random' %}checked{% endif %}
+                                        onchange="onArrangeTypeChange('random')">
+                                    <label class="btn btn-outline-primary fw-bold" for="type-random"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        data-bs-title="무작위 배치">
+                                        <i class="fa-solid fa-shuffle me-1"></i>랜덤
+                                    </label>
+                                    <input type="radio" class="btn-check"
+                                        name="arrange_type" id="type-ordered" value="ordered"
+                                        {% if arrange_type == 'ordered' %}checked{% endif %}
+                                        onchange="onArrangeTypeChange('ordered')">
+                                    <label class="btn btn-outline-success fw-bold" for="type-ordered"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        data-bs-title="번호 순서대로 배치">
+                                        <i class="fa-solid fa-arrow-down-1-9 me-1"></i>번호순
+                                    </label>
+                                </div>
+                            </fieldset>
+                        </div>
+                        <!-- 애니메이션 속도 + 배치 버튼 -->
+                        <div class="col-md-4">
+                            <label class="fw-bold small mb-1" for="anim-speed-slider">
+                                <i class="fa-solid fa-gauge me-1 text-primary"></i>
+                                배치 애니메이션 속도
+                            </label>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="small text-muted">🐢</span>
+                                <input type="range"
+                                    id="anim-speed-slider"
+                                    min="0" max="500"
+                                    step="10"
+                                    value="150"
+                                    aria-label="배치 애니메이션 속도 조절"
+                                    oninput="onAnimSpeedChange(this.value)"
+                                    style="flex:1;">
+                                <span class="small text-muted">🐇</span>
+                                <span class="anim-speed-badge" id="anim-speed-badge">150ms</span>
+                                <button type="button" onclick="updateUI('run')"
+                                        class="btn btn-success fw-bold shadow-sm"
+                                        id="run-btn"
+                                        style="white-space:nowrap;">
+                                    <i class="fa-solid fa-shuffle" id="run-btn-icon"></i>
+                                    <span id="run-btn-text">배치</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 번호순 방향 선택 패널 (번호순 선택 시 노출) -->
+                    <div id="order-dir-panel"
+                        style="display:{% if arrange_type == 'ordered' %}block{% else %}none{% endif %};"
+                        class="mt-3 pt-3 border-top">
+                        <input type="hidden" name="order_dir" id="order_dir_input" value="{{ order_dir }}">
+                        <div class="small fw-bold text-success mb-2">
+                            <i class="fa-solid fa-compass me-1"></i>
+                            번호 배치 방향 선택
+                            <span class="text-muted fw-normal ms-1">(클릭하여 선택)</span>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% set dir_icons = {
+                                'A': ('➡️⬇️', '1 2 3\n4 5 6\n7 8 9', '➡️ 좌측 상단 시작'),
+                                'B': ('⬇️➡️', '1 4 7\n2 5 8\n3 6 9', '⬇️ 좌측 상단 시작'),
+                                'C': ('⬅️⬇️', '3 2 1\n6 5 4\n9 8 7', '⬅️ 우측 상단 시작'),
+                                'D': ('➡️⬆️', '7 8 9\n4 5 6\n1 2 3', '➡️ 좌측 하단 시작'),
+                                'E': ('⬅️⬆️', '9 8 7\n6 5 4\n3 2 1', '⬅️ 우측 하단 시작'),
+                                'F': ('⬇️⬅️', '7 4 1\n8 5 2\n9 6 3', '⬇️ 우측 상단 시작'),
+                            } %}
+                            {% for dir_key, (arrow, grid_preview, desc) in dir_icons.items() %}
+                            <div class="order-dir-card {% if order_dir == dir_key %}selected{% endif %}"
+                                id="dir-card-{{ dir_key }}"
+                                onclick="selectOrderDir('{{ dir_key }}')"
+                                data-dir="{{ dir_key }}"
+                                title="{{ order_direction_labels[dir_key] }}"
+                                role="button"
+                                aria-pressed="{{ 'true' if order_dir == dir_key else 'false' }}">
+                                <!-- 미니 격자 숫자 미리보기 -->
+                                <div style="
+                                    font-family: monospace;
+                                    font-size: 0.62rem;
+                                    font-weight: bold;
+                                    color: #374151;
+                                    line-height: 1.6;
+                                    margin-bottom: 4px;
+                                    white-space: pre;">{{ grid_preview }}</div>
+                                <!-- 설명 텍스트 -->
+                                <div class="order-dir-label" style="white-space:pre-line;">{{ desc }}</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <!-- 에러 메시지 -->
+                {% if error %}
+                <div class="alert alert-danger text-center shadow-sm" role="alert">
+                    <i class="fa-solid fa-triangle-exclamation"></i> {{ error }}
+                </div>
+                {% endif %}
+                <!-- 좌석 데이터 -->
+                {% if seat_data %}
+                <script id="seat-data-script" type="application/json">
+                {{ seat_data | tojson }}
+                </script>
+                <section class="result-section" id="result-section"
+                         style="text-align:center;margin-top:30px;"
+                         aria-label="자리 배치 결과">
+                    <p class="text-muted small">
+                        마우스로 드래그하여 자리를 조정할 수 있습니다.
+                    </p>
+                    <div id="classroom-area"
+                         style="display:flex;flex-direction:column;align-items:center;gap:20px;width:100%;">
+                        <div id="chalkboard"
+                            class="badge fs-5 py-2 px-5 mb-3"
+                            style="background-color:{{ custom_colors.color_podium }};
+                                    color:#333;
+                                    border: 1.5px solid #aaa;"
+                            aria-label="교탁 위치">
+                            교탁 (칠판)
+                        </div>
+                        <div id="seat-container" class="seat-grid"
+                             aria-label="좌석 배치 그리드"
+                             aria-live="polite">
+                        </div>
+                    </div>
+                    <!-- 다운로드 패널 -->
+                    <div class="download-panel">
+                        <div class="download-panel-inner">
+                            <div class="grade-input-group">
+                                <input type="text" id="input_grade"
+                                       class="form-control"
+                                       style="width:70px;text-align:center;"
+                                       placeholder="학년"
+                                       value="{{ request.form.get('grade', '') }}"
+                                       aria-label="학년 입력">
+                                <span class="fw-bold">학년</span>
+                                <input type="text" id="input_class"
+                                       class="form-control"
+                                       style="width:70px;text-align:center;"
+                                       placeholder="반"
+                                       value="{{ request.form.get('grade_class', '') }}"
+                                       aria-label="반 입력">
+                                <span class="fw-bold">반</span>
+                            </div>
+                            <div class="divider-v" aria-hidden="true"></div>
+                            <div class="d-flex gap-2">
+                                <button type="button"
+                                        onclick="downloadCustom('basic')"
+                                        class="btn btn-success fw-bold">
+                                    <i class="fas fa-camera"></i> 이미지 저장
+                                </button>
+                                <button type="button"
+                                        onclick="downloadCustom('full')"
+                                        class="btn btn-primary fw-bold">
+                                    <i class="fas fa-clipboard-list"></i> 이미지(+명단) 저장
+                                </button>
+                            </div>
+                        </div>
+                        <small class="text-muted d-block mt-2">
+                            ※ 화면에서 조정한 배치가 그대로 저장됩니다.
+                        </small>
+                    </div>
+                </section>
+                {% endif %}
+                {% endif %}
+            </div>
+        </main>
+        <!-- ======================== 모달들 ======================== -->
+        <!-- 전체 학생 수정 -->
+        <div class="modal fade" id="modalStudent" tabindex="-1"
+             aria-labelledby="modalStudentLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="modalStudentLabel">전체 학생 명단 수정</h5>
+                        <button type="button" class="btn-close"
+                                data-bs-dismiss="modal" aria-label="닫기"></button>
+                    </div>
+                    <div class="modal-body">
+                        <small class="text-muted d-block mb-2">
+                            <span class="text-primary fw-bold">번호. 이름</span> 순으로 입력합니다.
+                        </small>
+                        <textarea class="form-control" id="text-manual-student"
+                                  rows="10"
+                                  placeholder="예시:&#13;&#10;1. 김홍균&#13;&#10;2. 박홍균&#13;&#10;..."
+                                  aria-label="전체 학생 명단 입력">{% for s in students %}{{ s }}
+{% endfor %}</textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary"
+                                data-bs-dismiss="modal">닫기</button>
+                        <button type="button" class="btn btn-primary"
+                                onclick="saveList('student')">저장하기</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- 앞자리 희망 수정 -->
+        <div class="modal fade" id="modalFront" tabindex="-1"
+             aria-labelledby="modalFrontLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="modalFrontLabel">앞자리 희망 명단 수정</h5>
+                        <button type="button" class="btn-close"
+                                data-bs-dismiss="modal" aria-label="닫기"></button>
+                    </div>
+                    <div class="modal-body">
+                        <small class="text-muted d-block mb-2">
+                            <span class="text-primary fw-bold">이름만 입력</span>해도 알아서 번호 붙여줍니다.
+                        </small>
+                        <textarea class="form-control" id="text-manual-front"
+                                  rows="10"
+                                  placeholder="예시:&#13;&#10;김홍균&#13;&#10;박홍균&#13;&#10;..."
+                                  aria-label="앞자리 희망 학생 명단 입력">{% for s in front_list %}{{ s }}
+{% endfor %}</textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary"
+                                data-bs-dismiss="modal">닫기</button>
+                        <button type="button" class="btn btn-primary"
+                                onclick="saveList('front')">저장하기</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- 짝 제한 수정 -->
+        <div class="modal fade" id="modalRestrict" tabindex="-1"
+             aria-labelledby="modalRestrictLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="modalRestrictLabel">짝 제한 명단 수정</h5>
+                        <button type="button" class="btn-close"
+                                data-bs-dismiss="modal" aria-label="닫기"></button>
+                    </div>
+                    <div class="modal-body">
+                        <small class="text-muted d-block mb-2">
+                            <span class="text-primary fw-bold">이름,이름</span> 형태로 입력합니다.
+                        </small>
+                        <textarea class="form-control" id="text-manual-restrict"
+                                  rows="10"
+                                  placeholder="예시:&#13;&#10;김홍균,박홍균&#13;&#10;최홍균,정홍균&#13;&#10;..."
+                                  aria-label="짝 제한 명단 입력">{% for pair in restrict_list %}{{ pair[0] }}, {{ pair[1] }}
+{% endfor %}</textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary"
+                                data-bs-dismiss="modal">닫기</button>
+                        <button type="button" class="btn btn-primary"
+                                onclick="saveList('restrict')">저장하기</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- 가이드 모달 -->
+        <div class="modal fade" id="guideModal" tabindex="-1"
+             aria-labelledby="guideModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="guideModalLabel">📝 파일 작성 가이드</h5>
+                        <button type="button" class="btn-close"
+                                data-bs-dismiss="modal" aria-label="닫기"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="guide-box">
+                            <h4>1. 학생 명단 파일 (필수)</h4>
+                            <p>엑셀(.xlsx, .csv) 파일에 번호 | 이름을 입력하세요.</p>
+                            <ul>
+                                <li><strong>A열:</strong> 번호 (숫자만)</li>
+                                <li><strong>B열:</strong> 이름</li>
+                            </ul>
+                            <a href="/download_sample/student" class="btn btn-sm btn-success">
+                                예시 파일 다운로드 (.xlsx)
+                            </a>
+                        </div>
+                        <div class="guide-box" style="border-left-color:#ff9800;">
+                            <h4>2. 앞자리 희망 파일 (선택)</h4>
+                            <p>선택한 학생들이 <strong>앞자리에 우선 배치</strong>됩니다.</p>
+                            <ul>
+                                <li>메모장(.txt)에 <strong>한 줄에 이름 하나씩</strong> 입력하세요.</li>
+                                <li>엑셀(.xlsx)도 가능합니다.</li>
+                            </ul>
+                            <pre class="bg-light p-2 rounded">김홍균
+박홍균</pre>
+                            <a href="/download_sample/front" class="btn btn-sm btn-info text-white">
+                                예시 파일 다운로드 (.txt)
+                            </a>
+                        </div>
+                        <div class="guide-box" style="border-left-color:#f44336;">
+                            <h4>3. 짝 제한 파일 (선택)</h4>
+                            <p>선택한 학생들이 짝이 되지 않도록 떼어놓습니다.</p>
+                            <ul>
+                                <li>메모장(.txt)에 <strong>이름,이름</strong> 형태로 입력하세요.</li>
+                            </ul>
+                            <pre class="bg-light p-2 rounded">김홍균,박홍균
+최홍균,정홍균</pre>
+                            <a href="/download_sample/restrict" class="btn btn-sm btn-danger">
+                                예시 파일 다운로드 (.txt)
+                            </a>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary"
+                                data-bs-dismiss="modal">닫기</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+<!-- 푸터 -->
+<footer class="site-footer">
+    <hr>
+    <p>
+        <strong>자리배치 도우미</strong><br>
+        문의: <a href="mailto:mynameishongkyunpark@gmail.com">
+            mynameishongkyunpark@gmail.com
+        </a><br>
+        <a href="/privacy"
+            style="color: #888; font-size: 0.85rem; text-decoration: none;">
+                개인정보처리방침
+            </a>
+        <span style="font-size:0.8em;">© 2026. All rights reserved.</span>
+    </p>
+</footer>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+'use strict';
+// ============================================================
+// 0. 상수 및 색상 기본값
+// ============================================================
+const COLLAPSE_KEY = 'my_collapse_state';
+const DEFAULT_COLORS = {
+    color_default:     '#E3F2FD',
+    color_front:       '#FFCDD2',
+    color_empty:       '#F5F5F5',
+    color_seat_border: '#000000',
+    color_grid_bg:     '#FFFFFF',
+    color_podium:      '#F5C0F5',
+};
+let currentColors = {
+    color_default:     '{{ custom_colors.color_default }}',
+    color_front:       '{{ custom_colors.color_front }}',
+    color_empty:       '{{ custom_colors.color_empty }}',
+    color_seat_border: '{{ custom_colors.color_seat_border }}',
+    color_grid_bg:     '{{ custom_colors.color_grid_bg }}',
+    color_podium:      '{{ custom_colors.color_podium }}',
+};
+// ============================================================
+// 1. 좌석 데이터 파싱
+// ============================================================
+function getSeatData() {
+    const el = document.getElementById('seat-data-script');
+    if (!el) return [];
+    try {
+        return JSON.parse(el.textContent.trim());
+    } catch (e) {
+        console.error('좌석 데이터 파싱 실패:', e);
+        return [];
+    }
+}
+// ============================================================
+// 2. CSS 변수로 색상 적용
+// ============================================================
+function applyCSSColors(colors) {
+    const root = document.documentElement;
+    root.style.setProperty('--color-default',     colors.color_default     || DEFAULT_COLORS.color_default);
+    root.style.setProperty('--color-front',       colors.color_front       || DEFAULT_COLORS.color_front);
+    root.style.setProperty('--color-empty',       colors.color_empty       || DEFAULT_COLORS.color_empty);
+    root.style.setProperty('--color-seat-border', colors.color_seat_border || DEFAULT_COLORS.color_seat_border);
+    root.style.setProperty('--color-grid-bg',     colors.color_grid_bg     || DEFAULT_COLORS.color_grid_bg);
+    applyPodiumColor(colors.color_podium || DEFAULT_COLORS.color_podium);
+    const grid = document.getElementById('seat-container');
+    if (grid) grid.style.backgroundColor = colors.color_grid_bg || DEFAULT_COLORS.color_grid_bg;
+}
+// ============================================================
+// 3. 색상 미리보기 (실시간)
+// ============================================================
+function previewColor(key, value) {
+    const preview = document.getElementById('preview-' + key);
+    if (preview) preview.style.backgroundColor = value;
+    currentColors[key] = value;
+    applyCSSColors(currentColors);
+    updatePreviewGrid();
+    if (key === 'color_podium') applyPodiumColor(value);
+}
+function updatePreviewGrid() {
+    const grid = document.getElementById('preview-grid');
+    if (!grid) return;
+    grid.style.backgroundColor = currentColors.color_grid_bg;
+    const seats = grid.querySelectorAll('.preview-seat');
+    const borderStyle = `2px solid ${currentColors.color_seat_border}`;
+    if (seats[0]) { seats[0].style.backgroundColor = currentColors.color_default; seats[0].style.border = borderStyle; }
+    if (seats[1]) { seats[1].style.backgroundColor = currentColors.color_front;   seats[1].style.border = borderStyle; }
+}
+function applyPodiumColor(color) {
+    const chalkboard = document.getElementById('chalkboard');
+    if (chalkboard) chalkboard.style.backgroundColor = color;
+}
+// ============================================================
+// 4. 색상 초기화 (단일 항목)
+// ============================================================
+function resetColor(key, defaultVal) {
+    const picker  = document.getElementById('picker-' + key);
+    const preview = document.getElementById('preview-' + key);
+    if (picker)  picker.value = defaultVal;
+    if (preview) preview.style.backgroundColor = defaultVal;
+    currentColors[key] = defaultVal;
+    applyCSSColors(currentColors);
+    updatePreviewGrid();
+}
+// ============================================================
+// 5. 색상 전체 초기화
+// ============================================================
+function resetAllColors() {
+    if (!confirm('모든 색상을 기본값으로 초기화하겠습니까?')) return;
+    Object.keys(DEFAULT_COLORS).forEach(key => resetColor(key, DEFAULT_COLORS[key]));
+}
+// ============================================================
+// 6. 색상 저장
+// ============================================================
+async function saveColors() {
+    try {
+        const res  = await fetch('/api/save_colors', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(currentColors)
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            showToast('색상이 저장되었습니다! 🎨', 'success');
+            const seatData = getSeatData();
+            if (seatData.length > 0) renderSeats(seatData);
+        } else {
+            showToast('저장 실패: ' + data.message, 'danger');
+        }
+    } catch (err) {
+        console.error(err);
+        showToast('서버 연결 실패!', 'danger');
+    }
+}
+// ============================================================
+// 7. 토스트 메시지
+// ============================================================
+function showToast(message, type = 'success') {
+    document.querySelectorAll('.custom-toast').forEach(t => t.remove());
+    const toast = document.createElement('div');
+    toast.className = `custom-toast alert alert-${type} shadow`;
+    toast.style.cssText = `
+        position:fixed; bottom:30px; left:50%;
+        transform:translateX(-50%);
+        z-index:9999; padding:12px 24px;
+        border-radius:30px; font-weight:bold;
+        min-width:200px; text-align:center;
+        animation:fadeInUp 0.3s ease;
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s';
+        setTimeout(() => toast.remove(), 300);
+    }, 2000);
+}
+// ============================================================
+// 8. collapse 상태 복원
+// ============================================================
+(function restoreCollapseState() {
+    const collapseEl = document.getElementById('collapseAdvanced');
+    const btnEl      = document.querySelector('[data-bs-target="#collapseAdvanced"]');
+    if (localStorage.getItem(COLLAPSE_KEY) === 'open') {
+        if (collapseEl) collapseEl.classList.add('show');
+        if (btnEl) { btnEl.classList.remove('collapsed'); btnEl.setAttribute('aria-expanded', 'true'); }
+    }
+})();
+// ============================================================
+// 9. 사이드바 토글
+// ============================================================
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('active');
+    document.getElementById('content').classList.toggle('active');
+    document.getElementById('sidebarCollapse').classList.toggle('active');
+}
+// ============================================================
+// 10. 애니메이션 속도 설정
+// ============================================================
+let DELAY_PER_CARD = 150;
+(function restoreAnimSpeed() {
+    const saved  = localStorage.getItem('animSpeedMs');
+    const slider = document.getElementById('anim-speed-slider');
+    const badge  = document.getElementById('anim-speed-badge');
+    if (saved !== null) {
+        const ms = parseInt(saved);
+        DELAY_PER_CARD = ms;
+        if (slider) slider.value      = 500 - ms;
+        if (badge)  badge.textContent = ms === 0 ? '없음' : `${ms}ms`;
+    }
+})();
+function onAnimSpeedChange(value) {
+    const ms = 500 - parseInt(value);
+    DELAY_PER_CARD = ms;
+    const badge = document.getElementById('anim-speed-badge');
+    if (badge) badge.textContent = ms === 0 ? '없음' : `${ms}ms`;
+    localStorage.setItem('animSpeedMs', ms);
+}
+// ============================================================
+// 11. 배치 방식 변경 핸들러 (신규)
+// ============================================================
+function onArrangeTypeChange(type) {
+    const panel   = document.getElementById('order-dir-panel');
+    const fabBtn  = document.getElementById('fab-btn');
+    const fabIcon = document.getElementById('fab-icon');
+    const runIcon = document.getElementById('run-btn-icon');
+    const runText = document.getElementById('run-btn-text');
+    if (type === 'ordered') {
+        if (panel)   panel.style.display        = 'block';
+        if (fabBtn)  fabBtn.style.backgroundColor = '#198754';
+        if (fabIcon) fabIcon.className = 'fa-solid fa-arrow-down-1-9';
+        if (runIcon) runIcon.className = 'fa-solid fa-arrow-down-1-9';
+        if (runText) runText.textContent = '번호순 배치';
+    } else {
+        if (panel)   panel.style.display        = 'none';
+        if (fabBtn)  fabBtn.style.backgroundColor = '#0d6efd';
+        if (fabIcon) fabIcon.className = 'fa-solid fa-rocket';
+        if (runIcon) runIcon.className = 'fa-solid fa-shuffle';
+        if (runText) runText.textContent = '배치';
+    }
+}
+// ============================================================
+// 12. 번호순 방향 선택 (신규)
+// ============================================================
+function selectOrderDir(dir) {
+    const input = document.getElementById('order_dir_input');
+    if (input) input.value = dir;
+    document.querySelectorAll('.order-dir-card').forEach(card => {
+        const isSelected = card.dataset.dir === dir;
+        card.classList.toggle('selected', isSelected);
+        card.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+    });
+}
+// ============================================================
+// 13. 고정석/제외석 select 변경 핸들러
+// ============================================================
+function onFixedSeatChange(selectEl, r, c) {
+    const td  = document.getElementById(`td_${r}_${c}`);
+    const val = selectEl.value;
+    td.classList.remove('seat-fixed', 'seat-excluded');
+    selectEl.style.backgroundColor = '';
+    selectEl.style.borderColor     = '';
+    selectEl.style.color           = '';
+    selectEl.style.fontWeight      = '';
+    if (val === '🚫 비움') {
+        td.classList.add('seat-excluded');
+    } else if (val !== '.') {
+        td.classList.add('seat-fixed');
+    }
+    updateFixedSeatSummary();
+}
+// ============================================================
+// 14. 고정석/제외석 초기 스타일 적용 (페이지 로드 시)
+// ============================================================
+function initFixedSeatStyles() {
+    document.querySelectorAll('.fixed-seat-select').forEach(select => {
+        const parts = select.name.split('_');
+        const r = parts[1];
+        const c = parts[2];
+        const td = document.getElementById(`td_${r}_${c}`);
+        if (!td) return;
+        const val = select.value;
+        td.classList.remove('seat-fixed', 'seat-excluded');
+        if (val === '🚫 비움') {
+            td.classList.add('seat-excluded');
+        } else if (val !== '.') {
+            td.classList.add('seat-fixed');
+        }
+    });
+    updateFixedSeatSummary();
+}
+// ============================================================
+// 15. 고정석/제외석 설정 요약 렌더링
+// ============================================================
+function updateFixedSeatSummary() {
+    const summaryEl = document.getElementById('fixed-seat-summary');
+    if (!summaryEl) return;
+    const fixedList    = [];
+    const excludedList = [];
+    document.querySelectorAll('.fixed-seat-select').forEach(select => {
+        const val   = select.value;
+        const parts = select.name.split('_');
+        const r     = parseInt(parts[1]) + 1;
+        const c     = parseInt(parts[2]) + 1;
+        if (val === '🚫 비움') {
+            excludedList.push(`${r}행 ${c}열`);
+        } else if (val !== '.') {
+            fixedList.push({ name: val, pos: `${r}행 ${c}열` });
+        }
+    });
+    if (fixedList.length === 0 && excludedList.length === 0) {
+        summaryEl.innerHTML = `
+            <span class="text-muted small">
+                <i class="fa-solid fa-circle-info me-1"></i>설정된 고정석/제외석이 없습니다.
+            </span>`;
+        return;
+    }
+    let html = `<div class="d-flex flex-wrap gap-2 align-items-center">`;
+    if (fixedList.length > 0) {
+        html += `
+            <span class="seat-summary-badge" style="background:#dbeafe;color:#1d4ed8;border:1px solid #3b82f6;">
+                🔒 고정석 ${fixedList.length}개
+            </span>`;
+        fixedList.forEach(item => {
+            html += `
+                <span class="seat-summary-badge bg-white border" style="color:#1d4ed8;font-weight:normal;">
+                    ${item.name} → ${item.pos}
+                </span>`;
+        });
+    }
+    if (excludedList.length > 0) {
+        html += `
+            <span class="seat-summary-badge" style="background:#fee2e2;color:#b91c1c;border:1px solid #ef4444;">
+                🚫 제외석 ${excludedList.length}개
+            </span>`;
+        excludedList.forEach(pos => {
+            html += `
+                <span class="seat-summary-badge bg-white border" style="color:#b91c1c;font-weight:normal;">
+                    ${pos}
+                </span>`;
+        });
+    }
+    html += `</div>`;
+    summaryEl.innerHTML = html;
+}
+// ============================================================
+// 16. 드래그 매니저
+// ============================================================
+const DragManager = {
+    srcEl: null,
+    init(item) {
+        item.setAttribute('draggable', 'true');
+        item.addEventListener('dragstart', (e) => {
+            DragManager.srcEl = item;
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', item.innerText);
+            item.classList.add('dragging');
+        });
+        item.addEventListener('dragover',  (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+        item.addEventListener('dragenter', (e) => { e.preventDefault(); if (item !== DragManager.srcEl) item.classList.add('drag-over'); });
+        item.addEventListener('dragleave', ()  => { item.classList.remove('drag-over'); });
+        item.addEventListener('drop', async (e) => {
+            e.stopPropagation();
+            item.classList.remove('drag-over');
+            if (DragManager.srcEl && DragManager.srcEl !== item) {
+                const temp = item.innerText;
+                item.innerText = DragManager.srcEl.innerText;
+                DragManager.srcEl.innerText = temp;
+                const tempClasses = [...item.classList];
+                const srcClasses  = [...DragManager.srcEl.classList];
+                ['front-seat'].forEach(cls => {
+                    item.classList.toggle(cls, srcClasses.includes(cls));
+                    DragManager.srcEl.classList.toggle(cls, tempClasses.includes(cls));
+                });
+                await DragManager.syncToServer();
+            }
+        });
+        item.addEventListener('dragend', () => {
+            item.classList.remove('dragging');
+            DragManager.srcEl = null;
+            document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        });
+    },
+    async syncToServer() {
+        const container = document.getElementById('seat-container');
+        if (!container) return;
+        const seats    = Array.from(container.children)
+            .filter(el => el.classList.contains('seat-item'))
+            .map(el => el.innerText.trim());
+        const viewType = document.querySelector('input[name="view_type"]:checked')?.value || 'student';
+        try {
+            await fetch('/api/update_seats', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ seats, view_type: viewType })
+            });
+        } catch (err) {
+            console.error('좌석 동기화 실패:', err);
+        }
+    }
+};
+// ============================================================
+// 17. 좌석 렌더링
+// ============================================================
+function renderSeats(data, animate = false) {
+    const container = document.getElementById('seat-container');
+    if (!container || !data || data.length === 0) return;
+    container.innerHTML = '';
+
+    const checkedMode   = document.querySelector('input[name="seat_mode"]:checked');
+    const isPartnerMode = checkedMode ? checkedMode.value === 'pair' : true;
+    const originalMaxCols = Math.max(...data.map(row => row.length));
+
+    // ✅ 1. 먼저 null 패딩을 채운 뒤
+    let sourceData = JSON.parse(JSON.stringify(data));
+    sourceData = sourceData.map(row => {
+        while (row.length < originalMaxCols) row.push(null);
+        return row;
+    });
+
+    // ✅ 2. 그 다음 시점 변환
+    const viewType = document.querySelector('input[name="view_type"]:checked')?.value || 'student';
+    if (viewType === 'teacher') {
+        sourceData.reverse();
+        sourceData.forEach(row => row.reverse());
+    }
+
+    // ✅ 3. SPACER 삽입
+    const renderData = sourceData.map(row => {
+        const newRow = [];
+        row.forEach((student, index) => {
+            newRow.push(student);
+            if (isPartnerMode && (index % 2 === 1) && (index < row.length - 1)) {
+                newRow.push('___SPACER___');
+            }
+        });
+        return newRow;
+    });
+    if (renderData.length > 0) {
+        const columnTemplate = renderData[0]
+            .map(item => item === '___SPACER___' ? 'minmax(15px, 40px)' : '1fr')
+            .join(' ');
+        container.style.gridTemplateColumns = columnTemplate;
+    }
+    container.style.gap             = isPartnerMode ? '15px' : '40px';
+    container.style.backgroundColor = currentColors.color_grid_bg;
+    const frontSet = new Set(
+        ({{ front_list | tojson }}).map(s => s.trim())
+    );
+    const allDivs = [];
+    renderData.forEach(row => {
+        row.forEach(item => {
+            const div = document.createElement('div');
+            if (item === '___SPACER___') {
+                div.className = 'spacer';
+                div.setAttribute('aria-hidden', 'true');
+                div.style.pointerEvents = 'none';
+                container.appendChild(div);
+            } else if (item === '🚫 비움' || item === null || item === '') {
+                div.className = 'seat-item empty-seat';
+                div.setAttribute('aria-hidden', 'true');
+                div.style.visibility  = 'hidden';
+                div.style.pointerEvents = 'none';
+                container.appendChild(div);
+            } else {
+                div.className = 'seat-item';
+                if (animate && DELAY_PER_CARD > 0) div.classList.add('card-flip-hidden');
+                if (frontSet.has(item.trim())) div.classList.add('front-seat');
+                div.innerText = item;
+                div.setAttribute('role', 'button');
+                div.setAttribute('aria-label', `${item} 좌석`);
+                DragManager.init(div);
+                allDivs.push(div);
+                container.appendChild(div);
+            }
+        });
+    });
+    if (animate && DELAY_PER_CARD > 0) {
+        allDivs.forEach((div, idx) => {
+            setTimeout(() => div.classList.add('card-flip-reveal'), idx * DELAY_PER_CARD);
+        });
+    }
+}
+// ============================================================
+// 18. 이벤트 바인딩
+// ============================================================
+function bindEvents() {
+    // 툴팁 초기화
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+        bootstrap.Tooltip.getInstance(el)?.dispose();
+        new bootstrap.Tooltip(el, { trigger: 'hover' });
+    });
+    const sidebarBtn = document.getElementById('sidebarCollapse');
+    if (sidebarBtn) {
+        sidebarBtn.onclick = (e) => { e.preventDefault(); toggleSidebar(); };
+    }
+    setupDragDrop('drop-student',  'file-student',  'text-student');
+    setupDragDrop('drop-front',    'file-front',    'text-front');
+    setupDragDrop('drop-restrict', 'file-restrict', 'text-restrict');
+    const classroomArea = document.getElementById('classroom-area');
+    document.querySelectorAll('input[name="view_type"]').forEach(radio => {
+        radio.addEventListener('change', function () {
+            if (classroomArea) {
+                classroomArea.style.flexDirection =
+                    this.value === 'teacher' ? 'column-reverse' : 'column';
+            }
+            const seatData = getSeatData();
+            if (seatData.length > 0) renderSeats(seatData, false);
+        });
+    });
+    const currentView = document.querySelector('input[name="view_type"]:checked');
+    if (currentView && classroomArea) {
+        classroomArea.style.flexDirection =
+            currentView.value === 'teacher' ? 'column-reverse' : 'column';
+    }
+    const collapseEl = document.getElementById('collapseAdvanced');
+    if (collapseEl) {
+        collapseEl.addEventListener('shown.bs.collapse',  () => localStorage.setItem(COLLAPSE_KEY, 'open'));
+        collapseEl.addEventListener('hidden.bs.collapse', () => localStorage.setItem(COLLAPSE_KEY, 'closed'));
+    }
+    // 슬라이더 상태 복원
+    const slider = document.getElementById('anim-speed-slider');
+    const badge  = document.getElementById('anim-speed-badge');
+    if (slider) {
+        slider.value = 500 - DELAY_PER_CARD;
+        if (badge) badge.textContent = DELAY_PER_CARD === 0 ? '없음' : `${DELAY_PER_CARD}ms`;
+    }
+    // 고정석 초기 스타일 적용
+    initFixedSeatStyles();
+    // ── 신규: 배치 방식 초기 UI 동기화 ──
+    const arrangeTypeChecked = document.querySelector('input[name="arrange_type"]:checked');
+    if (arrangeTypeChecked) {
+        onArrangeTypeChange(arrangeTypeChecked.value);
+    }
+    // ── 신규: 번호순 방향 카드 초기 선택 동기화 ──
+    const orderDirInput = document.getElementById('order_dir_input');
+    if (orderDirInput && orderDirInput.value) {
+        selectOrderDir(orderDirInput.value);
+    }
+}
+// ============================================================
+// 19. 파일 드래그앤드롭
+// ============================================================
+function setupDragDrop(zoneId, inputId, textId) {
+    const zone     = document.getElementById(zoneId);
+    const input    = document.getElementById(inputId);
+    const textElem = document.getElementById(textId);
+    if (!zone || !input) return;
+    zone.onclick    = (e) => { if (e.target.closest('.btn-delete-file')) return; input.click(); };
+    input.onchange  = () => { if (input.files.length > 0) handleFileSelect(input.files[0], zone, textElem); };
+    zone.ondragover  = (e) => { e.preventDefault(); zone.classList.add('dragover'); };
+    zone.ondragleave = (e) => { e.preventDefault(); zone.classList.remove('dragover'); };
+    zone.ondrop = (e) => {
+        e.preventDefault();
+        zone.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) {
+            input.files = e.dataTransfer.files;
+            handleFileSelect(e.dataTransfer.files[0], zone, textElem);
+        }
+    };
+}
+function handleFileSelect(file, zone, textElem) {
+    if (textElem) textElem.innerHTML = `<span class="fw-bold text-success">${file.name}</span>`;
+    const form = document.getElementById('mainForm');
+    form.method = 'POST';
+    form.submit();
+}
+// ============================================================
+// 20. 파일 삭제
+// ============================================================
+function clearFile(type, event) {
+    if (event) { event.stopPropagation(); event.preventDefault(); }
+    if (!confirm('등록된 데이터를 삭제하겠습니까?')) return;
+    const input = document.getElementById('file-' + type);
+    if (input) input.value = '';
+    updateUI('clear_' + type);
+}
+// ============================================================
+// 21. 고정석 초기화
+// ============================================================
+function resetFixedSeats() {
+    if (!confirm('설정된 모든 고정석/제외석을 초기화하겠습니까?')) return;
+    document.querySelectorAll('.fixed-seat-select').forEach(select => {
+        select.value = '.';
+        const parts  = select.name.split('_');
+        const td     = document.getElementById(`td_${parts[1]}_${parts[2]}`);
+        if (td) td.classList.remove('seat-fixed', 'seat-excluded');
+    });
+    updateFixedSeatSummary();
+    updateUI('redraw');
+}
+// ============================================================
+// 22. UI 업데이트 (AJAX)
+// ============================================================
+async function updateUI(actionType = null) {
+    const loading = document.getElementById('loading');
+    if (loading) loading.style.display = 'flex';
+    const isSidebarActive = document.getElementById('sidebar')?.classList.contains('active');
+    const form     = document.getElementById('mainForm');
+    const formData = new FormData(form);
+    if (actionType) formData.append('action', actionType);
+    let newSeatData = [];
+    try {
+        const response = await fetch('/', { method: 'POST', body: formData });
+        const htmlText = await response.text();
+        const parser   = new DOMParser();
+        const newDoc   = parser.parseFromString(htmlText, 'text/html');
+        const newWrapper = newDoc.getElementById('page-wrapper');
+        if (!newWrapper) return;
+        document.querySelectorAll('.modal.show').forEach(m => {
+            bootstrap.Modal.getInstance(m)?.hide();
+        });
+        const newSeatScript = newDoc.getElementById('seat-data-script');
+        if (newSeatScript) {
+            try { newSeatData = JSON.parse(newSeatScript.textContent.trim()); }
+            catch (e) { console.error('새 좌석 데이터 파싱 실패:', e); }
+        }
+        document.getElementById('page-wrapper').innerHTML = newWrapper.innerHTML;
+        if (isSidebarActive) {
+            document.getElementById('sidebar')?.classList.add('active');
+            document.getElementById('content')?.classList.add('active');
+            document.getElementById('sidebarCollapse')?.classList.add('active');
+        }
+        applyCSSColors(currentColors);
+        bindEvents();
+        if (newSeatData.length > 0) {
+            const shouldAnimate = (actionType === 'run');
+            renderSeats(newSeatData, shouldAnimate);
+        }
+        document.querySelectorAll('.modal').forEach(el => {
+            bootstrap.Modal.getInstance(el)?.dispose();
+            new bootstrap.Modal(el);
+        });
+    } catch (err) {
+        console.error('UI 업데이트 실패:', err);
+        alert('처리 중 오류가 발생했습니다.');
+    } finally {
+        if (loading) loading.style.display = 'none';
+    }
+}
+// ============================================================
+// 23. 명단 저장
+// ============================================================
+async function saveList(type) {
+    const idMap = {
+        student:  'text-manual-student',
+        front:    'text-manual-front',
+        restrict: 'text-manual-restrict'
+    };
+    const textArea = document.getElementById(idMap[type]);
+    if (!textArea) { alert('오류: 요소를 찾을 수 없습니다.'); return; }
+    try {
+        const res  = await fetch(`/update_list/${type}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: textArea.value })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            alert('저장되었습니다.');
+            window.location.href = '/';
+        } else {
+            alert('오류 발생: ' + data.message);
+        }
+    } catch (err) {
+        console.error(err);
+        alert('서버 연결 실패!');
+    }
+}
+// ============================================================
+// 24. 이미지 다운로드
+// ============================================================
+async function downloadCustom(mode) {
+    const grade      = document.getElementById('input_grade')?.value  || '';
+    const gradeClass = document.getElementById('input_class')?.value  || '';
+    const viewType   = document.querySelector('input[name="view_type"]:checked')?.value || 'student';
+    const colNum     = document.querySelector('input[name="col_num"]')?.value || '8';
+    const seatMode   = document.querySelector('input[name="seat_mode"]:checked')?.value || 'pair';
+    const container  = document.getElementById('seat-container');
+    const pureSeats  = Array.from(container?.children || [])
+        .filter(item => item.classList.contains('seat-item'))
+        .map(item => item.innerText.trim());
+    try {
+        await fetch('/api/save_colors', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(currentColors)
+        });
+    } catch (err) {
+        console.warn('색상 동기화 실패 (무시하고 계속):', err);
+    }
+    const seatsData = encodeURIComponent(pureSeats.join(','));
+    let url = `/download_image/${mode}`;
+    url += `?col_num=${colNum}&view_type=${viewType}&seat_mode=${seatMode}`;
+    url += `&grade=${encodeURIComponent(grade)}`;
+    url += `&grade_class=${encodeURIComponent(gradeClass)}`;
+    url += `&seats=${seatsData}`;
+    window.location.href = url;
+}
+// ============================================================
+// 25. 초기 실행
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+    applyCSSColors(currentColors);
+    bindEvents();
+    const initialSeatData = getSeatData();
+    if (initialSeatData.length > 0) renderSeats(initialSeatData, false);
+});
+</script>
+</body>
+</html>
